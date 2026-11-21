@@ -1,0 +1,42 @@
+# Secrets / entorno
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# RAG: datos generados / caches locales (no versionar, se regeneran con la ingesta)
+data/rag/processed/
+.tavily_usage.json
+
+# LangGraph
+.langgraph_api/
+
+# IDE / SO
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code (config local)
+.claude/*
+
+# Resultados locales de pruebas de carga ad-hoc
+*.local.json
