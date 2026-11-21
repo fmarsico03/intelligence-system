@@ -1,0 +1,95 @@
+{
+  "summary": {
+    "jobs": 5,
+    "done": 5,
+    "failed": 0,
+    "wall_clock_s": 237.59,
+    "enqueue_ms_p95": 39.3,
+    "e2e_s_p50": 58.48,
+    "e2e_s_p95": 225.94,
+    "processing_s_p50": 56.35,
+    "processing_s_p95": 224.49
+  },
+  "results": [
+    {
+      "idx": 1,
+      "job_id": "e74598e1aacb4569a3512da3f2123066",
+      "query": "What Python version does Google ADK require, and how do I run my agent as a REST API with `adk api_server`?",
+      "status": "DONE",
+      "enqueue_ms": 46.236900000167225,
+      "total_s": 179.3646730999999,
+      "processing_s": 176.298,
+      "approval": "approved",
+      "steps": 3,
+      "error": null,
+      "run_ids": [
+        "3394eeb4-1d7a-424b-a97a-92130fc5faa2",
+        "6324a7fc-0dff-4db3-8e5f-7d28f3c82ecf"
+      ]
+    },
+    {
+      "idx": 2,
+      "job_id": "cc277263e4d44030a403a80173f7d030",
+      "query": "Explicá brevemente, según la documentación de ADK, cómo se despliega un agente como servidor REST. Además, buscá cuál es el precio actual del dólar blue en Argentina.",
+      "status": "DONE",
+      "enqueue_ms": 10.769700000309967,
+      "total_s": 237.59001090000038,
+      "processing_s": 236.538,
+      "approval": "approved",
+      "steps": 3,
+      "error": null,
+      "run_ids": [
+        "546c0017-c3bf-46ba-a8cb-5275b47341dc",
+        "550917c9-1620-414b-83b3-8ee13eefc1f1"
+      ]
+    },
+    {
+      "idx": 3,
+      "job_id": "f4096721d51046058307b121645a1bb4",
+      "query": "¿Cuál es la tasa de política monetaria actual del Banco Central de Chile? Calculá cuánto rinde 1.000.000 CLP a esa tasa en un año con capitalización mensual.",
+      "status": "DONE",
+      "enqueue_ms": 10.179299999890645,
+      "total_s": 42.41128029999982,
+      "processing_s": 40.248,
+      "approval": "approved",
+      "steps": 3,
+      "error": null,
+      "run_ids": [
+        "0452ddb8-1261-4f33-b110-9e04668540d4",
+        "a6ce18a6-9135-4b7e-b070-9083547e5692"
+      ]
+    },
+    {
+      "idx": 4,
+      "job_id": "4d4039a267724c879587277c471a47b2",
+      "query": "Buscá el precio actual del cobre por libra y analizá el sentimiento de los titulares recientes sobre el cobre.",
+      "status": "DONE",
+      "enqueue_ms": 11.394099999961327,
+      "total_s": 48.457054999999855,
+      "processing_s": 44.702,
+      "approval": "rejected",
+      "steps": 3,
+      "error": null,
+      "run_ids": [
+        "b17f34c3-b0bf-407a-8cdf-7603b80dac67",
+        "4483eebb-3f46-4c21-8078-d16fe0b36b2b"
+      ]
+    },
+    {
+      "idx": 5,
+      "job_id": "5d55058a0f1d43409bd6589671e83edc",
+      "query": "¿La documentación de ADK explica cómo integrar reconocimiento facial en los agentes? Si no está documentado, buscá en la web si existe alguna librería de Python para eso.",
+      "status": "DONE",
+      "enqueue_ms": 8.129800000006071,
+      "total_s": 58.4753326,
+      "processing_s": 56.349,
+      "approval": "approved",
+      "steps": 3,
+      "error": null,
+      "run_ids": [
+        "43690578-d3a1-4812-8be5-293437e9ec33",
+        "c76eaa47-2bd5-474d-b092-543f3a556e47"
+      ]
+    }
+  ]
+}
