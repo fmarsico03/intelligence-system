@@ -29,7 +29,7 @@ from app.graph import initial_state, open_graph
 from app.jobs import JobStatus
 from app.observability import flush, init_observability, run_config
 
-log = logging.getLogger("agentops.worker")
+log = logging.getLogger("intelligence.worker")
 REAPER_INTERVAL_SECONDS = 30
 REAPER_GRACE_SECONDS = 60
 

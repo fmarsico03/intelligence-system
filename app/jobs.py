@@ -1,10 +1,10 @@
 """Estado de los jobs y cola de trabajo, ambos en Redis.
 
-Claves:
-  agentops:job:<id>          HASH  estado del job (status, query, result, error, timings, ...)
-  agentops:job:<id>:events   LIST  historial de transiciones (auditoría)
-  agentops:jobs              ZSET  índice de jobs por fecha de creación
-  agentops:queue             LIST  cola de mensajes para los workers ({"job_id", "action": start|resume})
+Claves (con el prefijo de settings.key_prefix, "intelligence" por default):
+  intelligence:job:<id>          HASH  estado del job (status, query, result, error, timings, ...)
+  intelligence:job:<id>:events   LIST  historial de transiciones (auditoría)
+  intelligence:jobs              ZSET  índice de jobs por fecha de creación
+  intelligence:queue             LIST  cola de mensajes para los workers ({"job_id", "action": start|resume})
 
 Ciclo de vida:
   PENDING -> RUNNING -> DONE

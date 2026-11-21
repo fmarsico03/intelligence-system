@@ -32,7 +32,7 @@ from app.redis_client import close_redis, get_redis
 from app.worker import Worker
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-log = logging.getLogger("agentops.api")
+log = logging.getLogger("intelligence.api")
 
 
 @asynccontextmanager

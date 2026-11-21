@@ -24,7 +24,7 @@ from typing import Any
 
 from app.config import settings
 
-log = logging.getLogger("agentops.observability")
+log = logging.getLogger("intelligence.observability")
 
 DEFAULT_PROJECT = "agentops-api"
 
