@@ -11,8 +11,8 @@ from typing import Annotated, Literal, TypedDict
 
 from langgraph.graph import MessagesState
 
-AgentName = Literal["researcher", "analyst"]
-RouteName = Literal["researcher", "analyst", "FINISH"]
+AgentName = Literal["researcher", "analyst", "knowledge"]
+RouteName = Literal["researcher", "analyst", "knowledge", "FINISH"]
 # "pending": todavía no se decidió · "not_required": no hay búsqueda paga (sin TAVILY_API_KEY o auto-aprobada)
 SearchApproval = Literal["pending", "approved", "rejected", "not_required"]
 
@@ -54,6 +54,7 @@ class OrchestratorState(MessagesState):
     # Resultados de cada dominio (última versión)
     research_findings: str
     analysis_results: str
+    knowledge_findings: str
 
     # Trazabilidad (append-only)
     contributions: Annotated[list[Contribution], operator.add]

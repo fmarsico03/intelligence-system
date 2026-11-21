@@ -1,8 +1,9 @@
-"""Orquestador multi-agente del M6 compilado con checkpointer de Redis y un gate Human-in-the-loop.
+"""Orquestador multi-agente compilado con checkpointer de Redis y un gate Human-in-the-loop.
 
     START -> supervisor -┬-> human_approval -> researcher -┐   (gate solo mientras la aprobación esté pendiente)
                          ├-> researcher ------------------─┤
-                         ├-> analyst ----------------------┴-> supervisor (ciclo jerárquico)
+                         ├-> analyst ----------------------┼-> supervisor (ciclo jerárquico)
+                         ├-> knowledge --------------------┘   (RAG híbrido sobre la doc. técnica indexada)
                          └-> synthesizer -> END
 
 El `thread_id` de LangGraph es el `job_id` de la API: cada job tiene su propia historia de checkpoints en
@@ -20,7 +21,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.config import settings
 from app.hitl import human_approval_node, needs_approval_gate
-from app.orchestrator.agents import analyst_node, research_node, supervisor_node, synthesizer_node
+from app.orchestrator.agents import analyst_node, knowledge_node, research_node, supervisor_node, synthesizer_node
 from app.orchestrator.state import OrchestratorState
 
 CHECKPOINT_TTL_MINUTES = settings.job_ttl_seconds // 60
@@ -28,12 +29,14 @@ CHECKPOINT_TTL_MINUTES = settings.job_ttl_seconds // 60
 
 def route_from_supervisor(
     state: OrchestratorState,
-) -> Literal["human_approval", "researcher", "analyst", "synthesizer"]:
+) -> Literal["human_approval", "researcher", "analyst", "knowledge", "synthesizer"]:
     nxt = state.get("next_agent", "FINISH")
     if nxt == "researcher":
         return "human_approval" if needs_approval_gate(state) else "researcher"
     if nxt == "analyst":
         return "analyst"
+    if nxt == "knowledge":
+        return "knowledge"
     return "synthesizer"
 
 
@@ -43,9 +46,7 @@ def build_graph(checkpointer=None):
     builder.add_node("human_approval", human_approval_node)
     builder.add_node("researcher", research_node)
     builder.add_node("analyst", analyst_node)
-    # EXTENSION POINT: acá se agrega builder.add_node("knowledge", knowledge_node) + la rama correspondiente
-    # en route_from_supervisor + builder.add_edge("knowledge", "supervisor") cuando se integre el RAG (fase
-    # posterior).
+    builder.add_node("knowledge", knowledge_node)
     builder.add_node("synthesizer", synthesizer_node)
 
     builder.add_edge(START, "supervisor")
@@ -56,12 +57,14 @@ def build_graph(checkpointer=None):
             "human_approval": "human_approval",
             "researcher": "researcher",
             "analyst": "analyst",
+            "knowledge": "knowledge",
             "synthesizer": "synthesizer",
         },
     )
     builder.add_edge("human_approval", "researcher")
     builder.add_edge("researcher", "supervisor")
     builder.add_edge("analyst", "supervisor")
+    builder.add_edge("knowledge", "supervisor")
     builder.add_edge("synthesizer", END)
     return builder.compile(checkpointer=checkpointer)
 
@@ -87,6 +90,7 @@ def initial_state(query: str, max_steps: int) -> dict:
         "revision_counts": {},
         "research_findings": "",
         "analysis_results": "",
+        "knowledge_findings": "",
         "contributions": [],
         "decisions": [],
         "search_approval": "pending",

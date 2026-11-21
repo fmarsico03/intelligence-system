@@ -21,31 +21,52 @@ SUPERVISOR_PROMPT = """Sos el SUPERVISOR de un equipo multi-agente. Dada la cons
 aportó cada especialista hasta ahora, decidí quién debe intervenir ahora o si es momento de finalizar.
 
 Especialistas disponibles:
-- "researcher": busca información en fuentes externas (web). NO calcula.
-- "analyst": hace cálculos, estadísticas y análisis de sentimiento SOBRE los datos ya investigados. NO busca.
+- "knowledge": responde preguntas sobre la documentación técnica YA INDEXADA (manuales/guías de Google ADK:
+  instalación, agentes, herramientas, despliegue, sesiones). Usa RAG híbrido (BM25 + semántico) y SOLO
+  contesta con lo que está en esos documentos; si no está, dice "No lo sé". NO busca en la web ni calcula.
+- "researcher": busca información en fuentes externas (web), para hechos actuales o temas FUERA de la
+  documentación indexada (precios, noticias, estadísticas, cualquier cosa no relacionada con ADK). NO calcula.
+- "analyst": hace cálculos, estadísticas y análisis de sentimiento SOBRE los datos ya investigados o
+  recuperados. NO busca en la web ni consulta la documentación.
 - "FINISH": la información reunida es suficiente; se pasa a la síntesis final.
 
-Flujo típico: researcher -> analyst -> FINISH. El analyst necesita datos del researcher primero.
+Cómo elegir entre "knowledge" y "researcher": si la consulta es sobre el SDK/documentación de Google ADK,
+mandá primero a "knowledge". Si "knowledge" ya respondió "No lo sé" para esa consulta, o el tema es externo
+a la documentación indexada (actualidad, otros productos, datos que cambian con el tiempo), mandá a
+"researcher" en su lugar — no insistas con "knowledge" dos veces para la misma pregunta sin respuesta.
 
-RÚBRICA DE VALIDACIÓN (aplicala antes de elegir FINISH; validation_passed=True solo si R1-R5 se cumplen):
-  R1. Hay datos factuales de fuentes externas con su fuente (URL) citada.
+Flujo típico: (knowledge | researcher) -> analyst (solo si la consulta pide cálculo/estadística/sentimiento)
+-> FINISH.
+
+RÚBRICA DE VALIDACIÓN (aplicala antes de elegir FINISH; validation_passed=True solo si R1-R6 se cumplen):
+  R1. Hay datos factuales de fuentes externas o de la documentación técnica, con su fuente citada (URL, o
+      archivo+página si viene de "knowledge").
   R2. El análisis usa esos datos y no inventa números (los cálculos provienen de herramientas).
   R3. Los cálculos son coherentes con los datos (ej. cantidad de períodos correcta).
   R4. Todas las partes de la consulta del usuario están cubiertas.
   R5. Recencia: si la consulta pide datos "recientes"/"últimos", los períodos reportados deben ser los más
       recientes disponibles respecto de la FECHA DE HOY (no datos de hace un año si existen más nuevos).
+  R6. Si "knowledge" respondió "No lo sé" para una consulta sobre la documentación indexada, no se inventa
+      la respuesta: se declara la limitación, o se deriva a "researcher" si el tema admite buscarse en la web.
 Si un criterio falla, delegá al especialista responsable con una `instruction` que incluya el feedback
-concreto de qué corregir. Si el analyst reportó DATOS_INSUFICIENTES, delegá al researcher.
-COHERENCIA: si el researcher entregó hallazgos NUEVOS después del último análisis, el análisis quedó
-desactualizado: delegá al analyst para que lo rehaga sobre los datos nuevos antes de elegir FINISH.
+concreto de qué corregir. Si el analyst reportó DATOS_INSUFICIENTES, delegá a "researcher" o "knowledge"
+según de dónde deberían salir esos datos.
+COHERENCIA: si "researcher" o "knowledge" entregó hallazgos NUEVOS después del último análisis, el análisis
+quedó desactualizado: delegá al analyst para que lo rehaga sobre los datos nuevos antes de elegir FINISH.
 Criterio de SUFICIENCIA: no busques perfección. Si los datos disponibles responden razonablemente la
 consulta y las limitaciones están declaradas, elegí FINISH.
 
 La `instruction` debe ser autocontenida: el especialista NO ve la conversación, solo tu instrucción."""
 
+FIELD_BY_AGENT = {
+    "researcher": "research_findings",
+    "analyst": "analysis_results",
+    "knowledge": "knowledge_findings",
+}
+
 
 class SupervisorDecision(BaseModel):
-    next: Literal["researcher", "analyst", "FINISH"] = Field(description="Siguiente nodo a ejecutar")
+    next: Literal["researcher", "analyst", "knowledge", "FINISH"] = Field(description="Siguiente nodo a ejecutar")
     instruction: str = Field(description="Instrucción autocontenida para el especialista (vacía si FINISH)")
     reasoning: str = Field(description="Justificación breve de la decisión")
     validation_passed: bool = Field(description="True si la rúbrica R1-R5 se cumple completa")
@@ -65,8 +86,11 @@ CONSULTA DEL USUARIO:
 HISTORIAL DE DELEGACIONES:
 {history}
 
-ÚLTIMOS HALLAZGOS DEL RESEARCHER:
+ÚLTIMOS HALLAZGOS DEL RESEARCHER (web):
 {state.get('research_findings') or 'N/A'}
+
+ÚLTIMOS HALLAZGOS DE KNOWLEDGE (RAG sobre doc. técnica indexada):
+{state.get('knowledge_findings') or 'N/A'}
 
 ÚLTIMO ANÁLISIS DEL ANALYST:
 {state.get('analysis_results') or 'N/A'}
@@ -76,12 +100,12 @@ Refinamientos usados: {state.get('revision_counts', {})} (máximo {MAX_REVISIONS
 
 
 def _analysis_is_stale(state: OrchestratorState) -> bool:
-    """True si hay un análisis previo pero el researcher aportó algo después de él."""
+    """True si hay un análisis previo pero researcher/knowledge aportaron algo después de él."""
     agents = [c["agent"] for c in state.get("contributions", [])]
     if "analyst" not in agents:
         return False
     last_analyst = len(agents) - 1 - agents[::-1].index("analyst")
-    return "researcher" in agents[last_analyst + 1 :]
+    return any(a in ("researcher", "knowledge") for a in agents[last_analyst + 1 :])
 
 
 async def supervisor_node(state: OrchestratorState) -> dict:
@@ -140,7 +164,7 @@ async def supervisor_node(state: OrchestratorState) -> dict:
 
     # ¿Es un refinamiento? (el agente ya había entregado algo)
     agent = decision.next
-    already_delivered = bool(state.get("research_findings" if agent == "researcher" else "analysis_results"))
+    already_delivered = bool(state.get(FIELD_BY_AGENT[agent]))
     if already_delivered:
         revisions[agent] = revisions.get(agent, 0) + 1
         # Regla de parada 2: tope de refinamientos por agente
@@ -174,16 +198,21 @@ SYNTH_PROMPT = """Sos el SINTETIZADOR final. Redactá la respuesta al usuario en
 usando EXCLUSIVAMENTE la información de los especialistas. No agregues datos nuevos.
 Estructura:
 1. Respuesta directa (2-3 frases).
-2. Datos clave (con fuentes) — aporte del Agente de Investigación.
-3. Análisis (cálculos y sentimiento) — aporte del Agente de Análisis.
-4. Limitaciones / advertencias (incluí si el cierre fue forzado por límite de pasos)."""
+2. Documentación técnica (con fuentes archivo+página) — aporte del Agente de Conocimiento (RAG), si intervino.
+3. Datos de fuentes externas (con URLs) — aporte del Agente de Investigación, si intervino.
+4. Análisis (cálculos y sentimiento) — aporte del Agente de Análisis, si intervino.
+5. Limitaciones / advertencias (incluí si el cierre fue forzado por límite de pasos, o si "knowledge"
+   respondió "No lo sé")."""
 
 
 async def synthesizer_node(state: OrchestratorState) -> dict:
     last = state.get("decisions", [])[-1] if state.get("decisions") else {}
     context = f"""CONSULTA: {state['user_query']}
 
-INVESTIGACIÓN:
+CONOCIMIENTO TÉCNICO (RAG sobre doc. indexada):
+{state.get('knowledge_findings') or 'N/A'}
+
+INVESTIGACIÓN (web):
 {state.get('research_findings') or 'N/A'}
 
 ANÁLISIS:

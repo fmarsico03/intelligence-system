@@ -4,6 +4,7 @@
   GET  /tasks/{id}           -> estado del job (PENDING / RUNNING / AWAITING_APPROVAL / DONE / FAILED).
   GET  /tasks                -> últimos jobs.
   POST /tasks/{id}/approve   -> respuesta humana al pedido de aprobación (ver app/hitl.py).
+  POST /knowledge/query      -> RAG híbrido directo (sin agentes): retrieve + generación grounded.
   GET  /health               -> Redis, cola, worker y observabilidad.
   GET  /graph                -> diagrama Mermaid del grafo.
 
@@ -25,6 +26,8 @@ from app.graph import build_graph, open_graph
 from app.hitl import router as hitl_router
 from app.jobs import TERMINAL, JobStatus
 from app.observability import flush, init_observability
+from app.rag.rag import RAGResponse, get_rag_response
+from app.rag.startup import ensure_index_ready
 from app.redis_client import close_redis, get_redis
 from app.worker import Worker
 
@@ -37,6 +40,7 @@ async def lifespan(app: FastAPI):
     app.state.observability = init_observability()
     async with AsyncExitStack() as stack:
         await get_redis().ping()
+        await ensure_index_ready()
         app.state.worker = None
         if settings.run_embedded_worker:
             graph = await open_graph(stack)
@@ -118,3 +122,20 @@ async def health() -> dict:
 @app.get("/graph", tags=["ops"])
 async def graph_diagram() -> dict:
     return {"mermaid": build_graph().get_graph().draw_mermaid()}
+
+
+class KnowledgeQuery(BaseModel):
+    question: str = Field(
+        ..., min_length=3, max_length=1000,
+        examples=["How do I run my ADK agent as a REST API?"],
+    )
+
+
+@app.post("/knowledge/query", tags=["knowledge"], response_model=RAGResponse)
+async def knowledge_query(body: KnowledgeQuery) -> RAGResponse:
+    """Prueba directa del RAG híbrido (sin pasar por el grafo de agentes): retrieve + generación grounded.
+
+    Responde "No lo sé" si la pregunta no está cubierta por la documentación técnica indexada. Útil para
+    probar el módulo RAG de forma aislada, además de vía el agente "knowledge" del Supervisor.
+    """
+    return await get_rag_response(body.question)
