@@ -87,7 +87,8 @@ intelligence-system/
 ├── data/rag/                       # PDFs de la documentación de Google ADK + categories.json + golden_set.json
 ├── scripts/                        # load_test.py (5 escenarios) · langsmith_report.py
 ├── tests/                          # test_flow.py (HITL/jobs) · test_ingest/metrics/retriever/evaluate.py (RAG)
-├── screenshots/                    # evidencia de las corridas (load_test_results.json, langsmith_report.txt)
+├── screenshots/                    # evidencia de las corridas (load_test_results.json, langsmith_report.txt,
+│                                   # capturas 01–04 del dashboard de LangSmith)
 ├── docker-compose.yml · Dockerfile · requirements.txt · .env.example · run.sh
 ```
 
@@ -225,6 +226,27 @@ Dispara los 5 escenarios con `python scripts/load_test.py` (cubren `knowledge` p
 en `FAILED`. El nodo `knowledge` quedó claramente discriminado del resto en las trazas, lo que confirma que
 la integración del RAG en el grafo es trazable igual que los demás especialistas.
 
+### Capturas del dashboard
+
+**Lista de trazas** — las 5 de arriba son las del load test (las de abajo, corridas previas), con latencia,
+tokens y costo por ejecución:
+
+![Lista de trazas en LangSmith](screenshots/01_langsmith_traces_list.png)
+
+**Reanudación del HITL** — el Turn 2 del thread recibe `resume` con `approved: true` y el `researcher`
+continúa en la misma traza que el arranque:
+
+![Reanudación del HITL en LangSmith](screenshots/02_langsmith_hitl_resume.png)
+
+**Ruteo del Supervisor** — salida estructurada (`next`, `instruction`, `reasoning`) que deriva al
+`researcher` porque la consulta está fuera del corpus de ADK:
+
+![Decisión de ruteo del Supervisor](screenshots/03_langsmith_supervisor_routing.png)
+
+**Agente `knowledge` (RAG híbrido)** — `retrieve` → `EnsembleRetriever` (BM25 + Pinecone) y respuesta
+grounded "No lo sé" cuando la documentación indexada no cubre la consulta:
+
+![Traza del agente knowledge](screenshots/04_langsmith_knowledge_rag.png)
 
 ## Tests
 
