@@ -97,8 +97,7 @@ intelligence-system/
 
 - Docker y Docker Compose.
 - Keys de `GOOGLE_API_KEY` (Gemini) y `PINECONE_API_KEY` (Pinecone) — **obligatorias**: a diferencia de
-  `TAVILY_API_KEY` (opcional, degrada a `mock_search`), sin estas dos el sistema no levanta, porque el RAG
-  es un pilar central de esta entrega. `LANGSMITH_API_KEY` es necesaria para ver las trazas.
+  `TAVILY_API_KEY` (opcional, degrada a `mock_search`). `LANGSMITH_API_KEY` es necesaria para ver las trazas.
 
 ```bash
 cp .env.example .env     # completar las keys
@@ -158,9 +157,6 @@ La primera vez que el Supervisor deriva al `researcher`, la arista pasa por el n
    después de un reinicio, porque el estado está en Redis.
 5. **Si se aprueba**, el `researcher` usa Tavily. **Si se rechaza**, se construye **sin** `web_search` — lo
    impone el código, no el prompt.
-
-El agente `knowledge` (RAG) **no** pasa por este gate: no tiene un costo variable por llamada que lo
-justifique (Pinecone/embeddings no se miden en un presupuesto manual como Tavily).
 
 Sin `TAVILY_API_KEY` no hay costo y el gate deja pasar sin preguntar (`search_approval=not_required`).
 
@@ -229,9 +225,6 @@ Dispara los 5 escenarios con `python scripts/load_test.py` (cubren `knowledge` p
 en `FAILED`. El nodo `knowledge` quedó claramente discriminado del resto en las trazas, lo que confirma que
 la integración del RAG en el grafo es trazable igual que los demás especialistas.
 
-> Las capturas visuales del dashboard (lista de trazas, árbol por nodo, costo/latencia) se agregan a mano en
-> `screenshots/` desde <https://smith.langchain.com> (proyecto `intelligence-system`) — este README ya
-> incluye la evidencia numérica equivalente, leída de la misma API.
 
 ## Tests
 
@@ -244,18 +237,6 @@ pytest -q
 26/26 OK. Usan Redis real, `AsyncRedisSaver` real e `interrupt`/`resume` reales (con los agentes
 reemplazados por stubs) para `test_flow.py`; los tests de RAG (`test_ingest`, `test_metrics`,
 `test_retriever`, `test_evaluate`) son puros/con fixtures y no llaman a ninguna API externa.
-
-## Errores comunes y cómo se evitan
-
-| Error | Solución |
-|---|---|
-| Hard-coding de ids/modelos | Todo vía `.env` / `app/config.py` / `app/rag/config.py` — índice de Pinecone, modelos de Gemini, presupuestos, todo configurable sin tocar código. |
-| Mezclar sync dentro de `async def` | Endpoints y el grafo son async de punta a punta (Gemini, Tavily, Redis). La única pieza síncrona de propósito (la ingesta a Pinecone, con I/O de archivos y red) se corre con `asyncio.to_thread` desde el lifespan, nunca bloqueando el event loop. |
-| Caja negra sin trazas | LangSmith activado por default; los 5 escenarios de validación quedan documentados arriba con costo/tokens/latencia por nodo, incluyendo el nuevo agente `knowledge`. |
-| Excepciones silenciosas en background | `try/except` en el worker → `FAILED` con detalle. Timeout por job y reaper para jobs huérfanos. |
-| Carreras con jobs concurrentes | Transiciones de estado con Lua (compare-and-set). El guardián de créditos de Tavily es atómico en Redis. |
-| Sub-agentes heredando el checkpointer | Los agentes ReAct internos (`researcher`, `analyst`) se compilan con `checkpointer=False`: solo el grafo padre persiste en Redis. |
-| RAG alucinando fuera de su corpus | La cadena RAG responde `"No lo sé"` si la respuesta no está en el contexto recuperado (prompt + validación Pydantic), y el Supervisor respeta esa limitación (rúbrica R6) en vez de inventar. |
 
 ## Stack
 
